@@ -2,10 +2,12 @@ import { BrowserModule } from '@angular/platform-browser';
 import { NgModule } from '@angular/core';
 
 import { AppComponent } from './app.component';
+import { SurfaceViewComponent } from './surface-view/surface-view.component';
 
 @NgModule({
   declarations: [
-    AppComponent
+    AppComponent,
+    SurfaceViewComponent
   ],
   imports: [
     BrowserModule
