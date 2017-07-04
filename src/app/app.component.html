@@ -1,7 +1,7 @@
-<div style="display:flex; flex-direction:column; height:100vh">
+<div class="vbox wh100">
 
     <md-toolbar color="warn">
-        <input type="file" #inputFile >
+        <input type="file" #inputFile>
 
         <input #inputGridSize mdInput placeholder="Gridsize" value="100" type="number" maxlength="7">
 
@@ -9,23 +9,28 @@
         <button md-button [mdMenuTriggerFor]="menuFilter">Filter</button>
         <button md-button> Save</button>
 
-        <md-select placeholder="Color"  [(ngModel)]="service.colorType">
-            <md-option *ngFor="let c of service.colorTypes" [value]="c" >{{c}}</md-option>
+        <md-select placeholder="Color" [(ngModel)]="service.colorType">
+            <md-option *ngFor="let c of service.colorTypes" [value]="c">{{c}}</md-option>
         </md-select>
 
         <md-select placeholder="OnClick" [(ngModel)]="service.clickAction">
-            <md-option *ngFor="let c of service.clickActions" [value]="c" >{{c}}</md-option>
+            <md-option *ngFor="let c of service.clickActions" [value]="c">{{c}}</md-option>
         </md-select>
 
-        <button md-button>More</button>
+        <button md-button><md-icon>more_vert</md-icon></button>
+        <span class="grow"></span>
+        <button md-button (click)="sidenav.toggle()"><md-icon>menu</md-icon></button>
     </md-toolbar>
 
     <md-menu #menuFilter>
         <button md-menu-item *ngFor="let f of service.filterTypes" (click)="service.filter(f)">{{f}}</button>
     </md-menu>
 
-    <div style="flex: 1 1 auto; overflow:hidden;">
+    <md-sidenav-container class="grow">
+        <md-sidenav #sidenav align="end">
+            Jolly good!
+        </md-sidenav>
         <app-surface-view></app-surface-view>
-    </div>
+    </md-sidenav-container>
 
 </div>

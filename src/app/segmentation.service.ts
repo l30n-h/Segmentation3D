@@ -55,8 +55,8 @@ export class SegmentationService {
     return clickType;
   }
 
-  prepare(canvas) {
-    prepare(canvas);
+  prepare(surfaceView, canvas) {
+    prepare(surfaceView, canvas);
   }
 
   init() {
@@ -74,6 +74,7 @@ export class SegmentationService {
 }
 
 let renderer: THREE.WebGLRenderer;
+let surfaceView;
 let canvas;
 let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
@@ -102,14 +103,15 @@ let colorType = "Position";
 let clickType = "Info";
 
 let mouseDown = false;
-function prepare(c) {
+function prepare(sv, c) {
+  surfaceView = sv;
   canvas = c;
-  renderer = new THREE.WebGLRenderer({ canvas: canvas });
-  renderer.setPixelRatio(devicePixelRatio);
-  renderer.setSize(canvas.clientWidth, canvas.clientHeight);
 
+  renderer = new THREE.WebGLRenderer({ canvas: canvas });
+  renderer.setPixelRatio(window.devicePixelRatio);
   camera = new THREE.PerspectiveCamera(45, getSurfaceWidth() / getSurfaceHeight(), 0.1, 500);
   scene = new THREE.Scene();
+  resize();
 
   window.addEventListener('unload', (event) => {
     destroy();
@@ -125,18 +127,18 @@ function prepare(c) {
   window.addEventListener('keyup', (event) => {
     if (event.key == "Shift") controls.activate();
   })
-
-  canvas.addEventListener('mousedown', (event) => {
-    setMousePosition(event);
-    mouseDown = true;
-  }, false);
   window.addEventListener('mouseup', (event) => {
     mouseDown = false;
   }, false);
-  canvas.addEventListener('mousemove', (event) => {
+
+  surfaceView.addEventListener('mousedown', (event) => {
+    setMousePosition(event);
+    mouseDown = true;
+  }, false);
+  surfaceView.addEventListener('mousemove', (event) => {
     setMousePosition(event);
   }, false);
-  canvas.addEventListener('click', (event) => {
+  surfaceView.addEventListener('click', (event) => {
     setMousePosition(event);
   }, false);
 }
@@ -174,10 +176,10 @@ function destroy() {
 }
 
 function getSurfaceWidth() {
-  return canvas.offsetWidth;
+  return surfaceView.offsetWidth;
 }
 function getSurfaceHeight() {
-  return canvas.offsetHeight;
+  return surfaceView.offsetHeight;
 }
 
 function VoxelMap(...values) {
@@ -535,9 +537,11 @@ function init() {
 }
 
 function resize() {
-  camera.aspect = getSurfaceWidth() / getSurfaceHeight();
+  let width = getSurfaceWidth();
+  let height = getSurfaceHeight();
+  renderer.setSize(width, height);
+  camera.aspect = width / height;
   camera.updateProjectionMatrix();
-  renderer.setSize(getSurfaceWidth(), getSurfaceHeight());
 
   needsRerendering = true;
 }
@@ -601,8 +605,9 @@ function loopSimple() {
 }
 
 function setMousePosition(event) {
-  let x = ((event.pageX - canvas.offsetLeft) / getSurfaceWidth()) * 2 - 1;
-  let y = - ((event.pageY - canvas.offsetTop) / getSurfaceHeight()) * 2 + 1;
+  let rect = surfaceView.getBoundingClientRect();
+  let x = ((event.pageX - rect.left) / getSurfaceWidth()) * 2 - 1;
+  let y = - ((event.pageY - rect.top) / getSurfaceHeight()) * 2 + 1;
   if (event.ctrlKey) {
     if (mouseDown) doRaycast = "click"
     else if (doRaycast != "click") doRaycast = event.type;

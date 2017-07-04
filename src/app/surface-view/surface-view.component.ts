@@ -8,13 +8,14 @@ import { SegmentationService } from '../segmentation.service';
   styleUrls: ['./surface-view.component.css']
 })
 export class SurfaceViewComponent {
-  
+
+  @ViewChild('surfaceView') private surfaceView: ElementRef;
   @ViewChild('canvas') private canvas: ElementRef;
 
-  constructor(public service:SegmentationService) { }
+  constructor(public service: SegmentationService) { }
 
   ngOnInit() {
-    this.service.prepare(this.canvas.nativeElement);
+    this.service.prepare(this.surfaceView.nativeElement, this.canvas.nativeElement);
     this.service.init();
     this.service.start();
   }
