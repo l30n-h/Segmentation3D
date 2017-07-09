@@ -3,7 +3,7 @@
     <md-toolbar color="warn">
         <input type="file" #inputFile>
 
-        <input #inputGridSize mdInput placeholder="Gridsize" value="100" type="number" maxlength="7">
+        <input #inputGridSize placeholder="Gridsize" value="100" type="number" maxlength="7">
 
         <button md-button (click)="service.loadFile(inputFile['files'][0], inputGridSize.value)">Load</button>
         <button md-button [mdMenuTriggerFor]="menuFilter">Filter</button>
@@ -17,6 +17,7 @@
             <md-option *ngFor="let c of service.clickActions" [value]="c">{{c}}</md-option>
         </md-select>
 
+        <button md-button (click)="service.unselectAll()">Unselect all</button>
         <button md-button><md-icon>more_vert</md-icon></button>
         <span class="grow"></span>
         <button md-button (click)="sidenav.toggle()"><md-icon>menu</md-icon></button>
@@ -28,7 +29,27 @@
 
     <md-sidenav-container class="grow">
         <md-sidenav #sidenav align="end">
-            Jolly good!
+            <md-tab-group>
+                <md-tab label="Groups">
+                    <div class="vbox">
+                        <md-card *ngFor="let group of service.groups">
+                            <md-card-header>
+                                <div md-card-avatar style="background-color:red;"></div>
+                                <md-card-title>
+                                    <md-input-container>
+                                        <input mdInput placeholder="Name" [value]="group">
+                                    </md-input-container>
+                                </md-card-title>
+                            </md-card-header>
+                            <md-card-content></md-card-content>
+                            <md-card-actions>
+                                <button md-button (click)="service.groupSelected(group)">ADD SELECTED</button>
+                            </md-card-actions>
+                        </md-card>
+                    </div>
+                </md-tab>
+            </md-tab-group>
+
         </md-sidenav>
         <app-surface-view></app-surface-view>
     </md-sidenav-container>

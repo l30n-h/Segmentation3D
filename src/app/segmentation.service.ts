@@ -4,28 +4,29 @@ import * as THREE from 'three';
 @Injectable()
 export class SegmentationService {
 
-  constructor() { }
+  constructor() { groups.set("group1", undefined); groups.set("neueg2", undefined); }
 
-  filterTypes=[
+  filterTypes = [
     "Gauss",
     "Sobel",
     "Sobel no blur",
     "Make all values the same",
     "Extend edges",
     "Avg. gradients",
-    "Remove marked"
+    "Remove selected"
   ];
 
-  colorTypes=[
-   "Position",
-   "Value",
-   "Normal",
-   "Binarisation"
+  colorTypes = [
+    "Position",
+    "Value",
+    "Normal",
+    "Group",
+    "Binarisation"
   ];
 
-  clickActions=[
+  clickActions = [
     "Info",
-    "Mark",
+    "Select",
     "Flood-Fill"
   ];
 
@@ -41,18 +42,30 @@ export class SegmentationService {
     filter(type);
   }
 
-  set colorType(v){
+  set colorType(v) {
     setColorType(v);
   }
-  get colorType(){
+  get colorType() {
     return colorType;
   }
 
-  set clickAction(v){
+  set clickAction(v) {
     setClickAction(v);
   }
-  get clickAction(){
+  get clickAction() {
     return clickType;
+  }
+
+  get groups() {
+    return Array.from(groups.keys());
+  }
+
+  groupSelected(groupName) {
+    groupSelected(groupName);
+  }
+
+  unselectAll() {
+    unselectAll();
   }
 
   prepare(surfaceView, canvas) {
@@ -79,6 +92,7 @@ let canvas;
 let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
 
+let groups = new Map();
 let voxels = new VoxelMap();
 let rasterSize;
 let positionOffset = { x: 0, y: 0, z: 0 };
@@ -100,6 +114,7 @@ let line = new THREE.Line(geometry, material);
 
 
 let colorType = "Position";
+let lastColorType = colorType;
 let clickType = "Info";
 
 let mouseDown = false;
@@ -161,6 +176,7 @@ function save() {
 }
 
 function setColorType(type) {
+  lastColorType = colorType;
   colorType = type;
   updateColors();
 }
@@ -417,22 +433,34 @@ function Frustum(eye, dir, up, near, far, top, bottom, right, left) {
 function getColor(p, voxel = null) {
   if (!voxel) voxel = voxels.get(p.x, p.y, p.z);
   let red = 0, green = 0, blue = 0, vc;
-  if (colorType == "Position") {
-    red = incContrast(p.x, voxelsBounds.min.x, voxelsBounds.max.x, 30, 225);
-    green = incContrast(p.y, voxelsBounds.min.y, voxelsBounds.max.y, 30, 225);
-    blue = incContrast(p.z, voxelsBounds.min.z, voxelsBounds.max.z, 30, 225);
-  } else if (colorType == "Value") {
-    vc = incContrast(voxel.value, voxelsBounds.min.value, voxelsBounds.max.value, 30, 225);
-    red = green = blue = vc;
-  } else if (colorType == "Normal") {
-    red = incContrast(voxel["sx"] || 0, voxelsBounds.min.sx, voxelsBounds.max.sx, 30, 225);
-    green = incContrast(voxel["sy"] || 0, voxelsBounds.min.sy, voxelsBounds.max.sy, 30, 225);
-    blue = incContrast(voxel["sz"] || 0, voxelsBounds.min.sz, voxelsBounds.max.sz, 30, 225);
-  } else {
-    vc = Math.round(Math.floor(incContrast(voxel.value, voxelsBounds.min.value, voxelsBounds.max.value, 30, 225) / 19.5) * 19.5);
-    red = green = blue = vc;
+  function calcColor(type) {
+    if (type == "Position") {
+      red = incContrast(p.x, voxelsBounds.min.x, voxelsBounds.max.x, 30, 225);
+      green = incContrast(p.y, voxelsBounds.min.y, voxelsBounds.max.y, 30, 225);
+      blue = incContrast(p.z, voxelsBounds.min.z, voxelsBounds.max.z, 30, 225);
+    } else if (type == "Value") {
+      vc = incContrast(voxel.value, voxelsBounds.min.value, voxelsBounds.max.value, 30, 225);
+      red = green = blue = vc;
+    } else if (type == "Normal") {
+      red = incContrast(voxel["sx"] || 0, voxelsBounds.min.sx, voxelsBounds.max.sx, 30, 225);
+      green = incContrast(voxel["sy"] || 0, voxelsBounds.min.sy, voxelsBounds.max.sy, 30, 225);
+      blue = incContrast(voxel["sz"] || 0, voxelsBounds.min.sz, voxelsBounds.max.sz, 30, 225);
+    } else if (type == "Group") {
+      if (!voxel.group) {
+        calcColor(colorType==lastColorType?"Position":lastColorType);
+      } else {
+        let c = stringToColor(voxel.group);
+        red = incContrast(c.r || 0, 0, 255, 30, 225);
+        green = incContrast(c.g || 0, 0, 255, 30, 225);
+        blue = incContrast(c.b || 0, 0, 255, 30, 225);
+      }
+    } else {
+      vc = Math.round(Math.floor(incContrast(voxel.value, voxelsBounds.min.value, voxelsBounds.max.value, 30, 225) / 19.5) * 19.5);
+      red = green = blue = vc;
+    }
   }
-  if (voxel.marked) {
+  calcColor(colorType)
+  if (voxel.selected) {
     red *= 0.66;
     green *= 0.66;
     blue *= 0.66;
@@ -456,12 +484,47 @@ function setColor(cube, color) {
   }
 }
 
+function stringToColor(string) {
+  if (!string) return undefined;
+  let str = string;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  let r = (hash >> 8) & 0xFF;
+  let g = (hash >> 16) & 0xFF;
+  let b = (hash >> 24) & 0xFF;
+  return { r, g, b };
+}
+
+function groupSelected(groupName) {
+  voxels.forEach((voxel, key) => {
+    if (voxel.selected && !voxel.group) {
+      let voxelSet = groups.get(groupName);
+      voxel.group = groupName;
+      if (!voxelSet) {
+        voxelSet = new Set();
+        groups.set(groupName, voxelSet);
+      }
+      voxelSet.add(key);
+    }
+  });
+  updateColors();
+}
+
+function unselectAll() {
+  voxels.forEach((voxel, key) => {
+    delete voxel.selected;
+  });
+  updateColors();
+}
+
 function raycastClicked(position) {
   let vp = pointToVoxel(position);
   if (clickType == "Flood-Fill") {
     setTimeout(() => {
       let v2 = null
-      let marked = floodFill((p, p1) => {
+      let selected = floodFill((p, p1) => {
         // let v = voxels.get(x, y, z);
         // if (!v) return false;
         // return v.value > 0;
@@ -475,14 +538,14 @@ function raycastClicked(position) {
         return dot >= 0.98;
       }, vp);
 
-      marked.forEach((voxel, key) => {
-        voxels.getByKey(key)["marked"] = true;
+      selected.forEach((voxel, key) => {
+        voxels.getByKey(key)["selected"] = true;
       });
       updateColors();
     }, 0);
-  } else if (clickType == "Mark") {
+  } else if (clickType == "Select") {
     let voxel = voxels.get(vp.x, vp.y, vp.z);
-    if (voxel) voxel["marked"] = true;
+    if (voxel) voxel["selected"] = true;
   } else {
     console.log(vp);
     console.log(voxels.get(vp.x, vp.y, vp.z));
@@ -623,7 +686,7 @@ function setMousePosition(event) {
     );
     let nvoxels = frustum.getVoxels(voxels);
     nvoxels.forEach((voxel, key) => {
-      voxels.getByKey(key)["marked"] = true;
+      voxels.getByKey(key)["selected"] = true;
     });
     updateColors();
   }
@@ -883,10 +946,10 @@ function extendEdge(voxels) {
   return nvoxels;
 }
 
-function removeMarked(voxels) {
+function removeSelected(voxels) {
   let nvoxels = new VoxelMap();
   voxels.forEach((voxel, key) => {
-    if (!voxel.marked) nvoxels.setByKey(key, voxel)
+    if (!voxel.selected) nvoxels.setByKey(key, voxel)
   });
   return nvoxels;
 }
@@ -897,7 +960,7 @@ function setAllValuesTo(voxels, value) {
   });
   return voxels;
 }
-   
+
 function filter(filter = "") {
   setTimeout(() => {
     console.log("filter start")
@@ -910,8 +973,8 @@ function filter(filter = "") {
       });
     } else if (filter.startsWith("Sobel")) {
       nVoxels = normalizeGradients(sobel3D(voxels, !filter.endsWith("no blur")));
-    } else if (filter.startsWith("Remove marked")) {
-      nVoxels = removeMarked(voxels);
+    } else if (filter.startsWith("Remove selected")) {
+      nVoxels = removeSelected(voxels);
     } else if (filter.startsWith("Make all values the same")) {
       nVoxels = setAllValuesTo(voxels, 10);
     } else if (filter.startsWith("Extend edges")) {
@@ -1179,12 +1242,12 @@ function nextPowerOf2(a) {
 }
 
 function count8Neighbour(f) {
-  let marked = new VoxelMap();
+  let selected = new VoxelMap();
   f.forEach((voxel, key) => {
     let p = f.getPosition(key);
-    marked.setByKey(key, count8NeighbourAt(f, p.x, p.y, p.z));
+    selected.setByKey(key, count8NeighbourAt(f, p.x, p.y, p.z));
   });
-  return marked;
+  return selected;
 }
 
 function count8NeighbourAt(f, x, y, z) {
@@ -1200,17 +1263,17 @@ function count8NeighbourAt(f, x, y, z) {
   return n;
 }
 
-function floodFill(shouldBeMarked, p) {
-  let marked = new VoxelMap();
+function floodFill(shouldBeSelected, p) {
+  let selected = new VoxelMap();
   let stack = [];
   stack.push({ p: { x: p.x, y: p.y, z: p.z }, l: { x: p.x, y: p.y, z: p.z } });
   while (stack.length > 0) {
     let e = stack.pop();
     let p = e.p;
-    if (!marked.get(p.x, p.y, p.z)) {
-      let sbm = shouldBeMarked(e.p, e.l);
+    if (!selected.get(p.x, p.y, p.z)) {
+      let sbm = shouldBeSelected(e.p, e.l);
       if (sbm) {
-        marked.set(p.x, p.y, p.z, true);
+        selected.set(p.x, p.y, p.z, true);
         for (let nx = p.x - 1; nx <= p.x + 1; nx++) {
           for (let ny = p.y - 1; ny <= p.y + 1; ny++) {
             for (let nz = p.z - 1; nz <= p.z + 1; nz++) {
@@ -1223,7 +1286,7 @@ function floodFill(shouldBeMarked, p) {
       }
     }
   }
-  return marked;
+  return selected;
 }
 
 
