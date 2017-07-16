@@ -7,7 +7,7 @@ import { SegmentationService } from './segmentation.service';
   styleUrls: ['./app.component.css']
 })
 export class AppComponent {
-
+  
   constructor(public service: SegmentationService) { }
 
 }

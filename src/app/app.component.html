@@ -29,24 +29,27 @@
 
     <md-sidenav-container class="grow">
         <md-sidenav #sidenav align="end">
-            <md-tab-group>
-                <md-tab label="Groups">
-                    <div class="vbox">
-                        <md-card *ngFor="let group of service.groups">
-                            <md-card-header>
-                                <div md-card-avatar [style.backgroundColor]="service.rgbToHex(group.color)"></div>
+             <md-tab-group class="min100 wh100">
+                 <md-tab label="Groups" >
+                     <div class="vbox grow wh100 min100">
+                         <md-card *ngFor="let group of service.groups">
+                            <md-card-header >
+                                <div md-card-avatar [style.backgroundColor]="service.rgbToHex(group.color)"
+                                    [colorPicker]="service.rgbToHex(group.color)"
+                                    (colorPickerChange)="group.color=service.hexToRgb($event)"
+                                ></div>
                                 <md-input-container>
                                     <input mdInput placeholder="Name" [value]="group.name">
                                 </md-input-container>
+                                
                             </md-card-header>
-                            <!-- <md-card-content></md-card-content> -->
                             <md-card-actions>
                                 <button md-button (click)="service.addSelectedToGroup(group)">ADD SELECTED</button>
                             </md-card-actions>
-                        </md-card>
-                    </div>
-                </md-tab>
-            </md-tab-group>
+                        </md-card> 
+                    </div> 
+                </md-tab> 
+            </md-tab-group> 
 
         </md-sidenav>
         <app-surface-view></app-surface-view>

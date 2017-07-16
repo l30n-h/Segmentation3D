@@ -70,7 +70,25 @@ export class SegmentationService {
   }
 
   rgbToHex(c) {
-    return "#" + Math.floor(c.r).toString(16) + Math.floor(c.g).toString(16) + Math.floor(c.b).toString(16);
+    function componentToHex(c) {
+      var hex = Math.floor(c).toString(16);
+      return hex.length == 1 ? "0" + hex : hex;
+    }
+    return "#" + componentToHex(c.r) + componentToHex(c.g) + componentToHex(c.b);
+  }
+
+  hexToRgb(hex) {
+    var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+    hex = hex.replace(shorthandRegex, function (m, r, g, b) {
+      return r + r + g + g + b + b;
+    });
+
+    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : null;
   }
 
   prepare(surfaceView, canvas) {
@@ -510,7 +528,7 @@ function stringToColor(string) {
   return { r, g, b };
 }
 
-function addSelectedToGroup(group=undefined) {
+function addSelectedToGroup(group = undefined) {
   if (!group) {
     let name = groups.length.toString();
     let r = incContrast(Math.floor(Math.random() * 255), 0, 255, 30, 225);
@@ -989,13 +1007,13 @@ function filter(filter = "") {
     let nVoxels = voxels;
     if (filter.startsWith("Gauss")) {
       nVoxels = gauss3D(voxels);
-      voxels.forEach((voxel, key) => {
+      nVoxels.forEach((voxel, key) => {
         if (Math.abs(voxel.value) <= 0.001) nVoxels.removeByKey(key);
       });
     } else if (filter.startsWith("Sobel")) {
       nVoxels = normalizeGradients(sobel3D(voxels, !filter.endsWith("no blur")));
     } else if (filter.startsWith("Create group from selected")) {
-      nVoxels = addSelectedToGroup();
+      addSelectedToGroup();
     } else if (filter.startsWith("Remove selected")) {
       nVoxels = removeSelected(voxels);
     } else if (filter.startsWith("Make all values the same")) {

@@ -7,6 +7,8 @@ import { FormsModule } from '@angular/forms';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { MaterialModule } from '@angular/material';
 
+import { ColorPickerModule } from 'angular4-color-picker';
+
 import { AppComponent } from './app.component';
 import { SurfaceViewComponent } from './surface-view/surface-view.component';
 import { SegmentationService } from './segmentation.service';
@@ -20,7 +22,8 @@ import { SegmentationService } from './segmentation.service';
     BrowserModule,
     FormsModule,
     BrowserAnimationsModule,
-    MaterialModule
+    MaterialModule,
+    ColorPickerModule
   ],
   providers: [SegmentationService],
   bootstrap: [AppComponent]
