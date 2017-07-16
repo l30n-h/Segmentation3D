@@ -8,15 +8,20 @@ html, body {
 }
 
 .vbox {
+    display: -webkit-flex !important;
+    -webkit-flex-direction: column;
+
     display: flex !important;
     flex-direction: column;
 }
 
 .hbox {
+    display: -webkit-flex !important;
     display: flex !important;
 }
 
 .grow {
+    -webkit-flex: 1 1 auto;
     flex: 1 1 auto;
 }
 

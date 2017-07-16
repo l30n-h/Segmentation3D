@@ -1,10 +1,10 @@
-import { Injectable } from '@angular/core';
+import { Injectable, NgZone } from '@angular/core';
 import * as THREE from 'three';
 
 @Injectable()
 export class SegmentationService {
 
-  constructor() { groups.set("group1", undefined); groups.set("neueg2", undefined); }
+  constructor(private zone: NgZone) { }
 
   filterTypes = [
     "Gauss",
@@ -13,6 +13,7 @@ export class SegmentationService {
     "Make all values the same",
     "Extend edges",
     "Avg. gradients",
+    "Create group from selected",
     "Remove selected"
   ];
 
@@ -57,31 +58,43 @@ export class SegmentationService {
   }
 
   get groups() {
-    return Array.from(groups.keys());
+    return groups;
   }
 
-  groupSelected(groupName) {
-    groupSelected(groupName);
+  addSelectedToGroup(groupIndex) {
+    addSelectedToGroup(groupIndex);
   }
 
   unselectAll() {
     unselectAll();
   }
 
+  rgbToHex(c) {
+    return "#" + Math.floor(c.r).toString(16) + Math.floor(c.g).toString(16) + Math.floor(c.b).toString(16);
+  }
+
   prepare(surfaceView, canvas) {
-    prepare(surfaceView, canvas);
+    this.zone.runOutsideAngular(() => {
+      prepare(surfaceView, canvas);
+    });
   }
 
   init() {
-    init();
+    this.zone.runOutsideAngular(() => {
+      init();
+    });
   }
 
   start() {
-    loopSimple();
+    this.zone.runOutsideAngular(() => {
+      loopSimple();
+    });
   }
 
   destroy() {
-    destroy();
+    this.zone.runOutsideAngular(() => {
+      destroy();
+    });
   }
 
 }
@@ -92,7 +105,7 @@ let canvas;
 let scene: THREE.Scene;
 let camera: THREE.PerspectiveCamera;
 
-let groups = new Map();
+let groups = [];
 let voxels = new VoxelMap();
 let rasterSize;
 let positionOffset = { x: 0, y: 0, z: 0 };
@@ -447,12 +460,12 @@ function getColor(p, voxel = null) {
       blue = incContrast(voxel["sz"] || 0, voxelsBounds.min.sz, voxelsBounds.max.sz, 30, 225);
     } else if (type == "Group") {
       if (!voxel.group) {
-        calcColor(colorType==lastColorType?"Position":lastColorType);
+        calcColor(colorType == lastColorType ? "Position" : lastColorType);
       } else {
-        let c = stringToColor(voxel.group);
-        red = incContrast(c.r || 0, 0, 255, 30, 225);
-        green = incContrast(c.g || 0, 0, 255, 30, 225);
-        blue = incContrast(c.b || 0, 0, 255, 30, 225);
+        let c = voxel.group.color;
+        red = c.r;
+        green = c.g;
+        blue = c.b;
       }
     } else {
       vc = Math.round(Math.floor(incContrast(voxel.value, voxelsBounds.min.value, voxelsBounds.max.value, 30, 225) / 19.5) * 19.5);
@@ -497,16 +510,23 @@ function stringToColor(string) {
   return { r, g, b };
 }
 
-function groupSelected(groupName) {
+function addSelectedToGroup(group=undefined) {
+  if (!group) {
+    let name = groups.length.toString();
+    let r = incContrast(Math.floor(Math.random() * 255), 0, 255, 30, 225);
+    let g = incContrast(Math.floor(Math.random() * 255), 0, 255, 30, 225);
+    let b = incContrast(Math.floor(Math.random() * 255), 0, 255, 30, 225);
+    group = {
+      name,
+      color: { r, g, b },
+      voxelKeys: new Set()
+    };
+    groups[groups.length] = group;
+  }
   voxels.forEach((voxel, key) => {
     if (voxel.selected && !voxel.group) {
-      let voxelSet = groups.get(groupName);
-      voxel.group = groupName;
-      if (!voxelSet) {
-        voxelSet = new Set();
-        groups.set(groupName, voxelSet);
-      }
-      voxelSet.add(key);
+      voxel.group = group;
+      group.voxelKeys.add(key);
     }
   });
   updateColors();
@@ -580,6 +600,7 @@ function clearScene() {
 function clean() {
   clearScene();
   voxels.clear();
+  groups = [];
 }
 
 function init() {
@@ -973,6 +994,8 @@ function filter(filter = "") {
       });
     } else if (filter.startsWith("Sobel")) {
       nVoxels = normalizeGradients(sobel3D(voxels, !filter.endsWith("no blur")));
+    } else if (filter.startsWith("Create group from selected")) {
+      nVoxels = addSelectedToGroup();
     } else if (filter.startsWith("Remove selected")) {
       nVoxels = removeSelected(voxels);
     } else if (filter.startsWith("Make all values the same")) {
