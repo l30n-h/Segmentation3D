@@ -61,8 +61,17 @@ export class SegmentationService {
     return groups;
   }
 
-  addSelectedToGroup(groupIndex) {
-    addSelectedToGroup(groupIndex);
+  addSelectedToGroup(group) {
+    addSelectedToGroup(group);
+  }
+
+  showGroup(group) {
+    showGroup(group);
+  }
+
+
+  hideGroup(group) {
+    hideGroup(group);
   }
 
   unselectAll() {
@@ -131,6 +140,7 @@ let voxelsBounds = {
   min: { x: 0, y: 0, z: 0, value: 0, sx: 0, sy: 0, sz: 0 },
   max: { x: 0, y: 0, z: 0, value: 0, sx: 0, sy: 0, sz: 0 },
 };
+let voxelCubeMap = new Map();
 
 let controls;
 let raycaster = new THREE.Raycaster();
@@ -231,7 +241,8 @@ function getSurfaceHeight() {
 
 function VoxelMap(...values) {
 
-  let voxel = new Map();
+  this.voxel = new Map();
+  this.disabled = new Map();
 
   this.get = (x, y, z) => {
     return this.getByKey(this.getKey(x, y, z));
@@ -245,36 +256,61 @@ function VoxelMap(...values) {
     this.removeByKey(this.getKey(x, y, z));
   }
 
+  this.disable = (x, y, z) => {
+    this.disableByKey(this.getKey(x, y, z));
+  }
+
+  this.enable = (x, y, z) => {
+    this.enableByKey(this.getKey(x, y, z));
+  }
+
   this.getByKey = (k) => {
-    return voxel.get(k);
+    return this.voxel.get(k);
   }
 
   this.setByKey = (k, v) => {
-    voxel.set(k, v);
+    this.voxel.set(k, v);
   }
 
   this.removeByKey = (key) => {
-    voxel.delete(key);
+    this.voxel.delete(key);
+  }
+
+  this.disableByKey = (key) => {
+    let v = this.voxel.get(key);
+    if (v) {
+      this.voxel.delete(key);
+      this.disabled.set(key, v);
+    }
+  }
+
+  this.enableByKey = (key) => {
+    let v = this.disabled.get(key);
+    if (v) {
+      this.disabled.delete(key);
+      this.voxel.set(key, v);
+    }
   }
 
   this.size = () => {
-    return voxel.size;
+    return this.voxel.size;
   }
 
   this.clear = () => {
-    voxel.clear();
+    this.voxel.clear();
+    this.disabled.clear();
   }
 
   this.entries = () => {
-    return voxel.entries();
+    return this.voxel.entries();
   }
 
   this.values = () => {
-    return voxel.values();
+    return this.voxel.values();
   }
 
   this.keys = () => {
-    return voxel.keys();
+    return this.voxel.keys();
   }
 
   this.getPosition = (key) => {
@@ -292,7 +328,7 @@ function VoxelMap(...values) {
   }
 
   this.forEach = (callback) => {
-    return voxel.forEach(callback);
+    return this.voxel.forEach(callback);
   }
 
   if (values) values.forEach((v) => this.set(v.x, v.y, v.z, v));
@@ -530,16 +566,19 @@ function stringToColor(string) {
 
 function addSelectedToGroup(group = undefined) {
   if (!group) {
-    let name = groups.length.toString();
+    let groupId = groups.length;
+    let name = groupId.toString();
     let r = incContrast(Math.floor(Math.random() * 255), 0, 255, 30, 225);
     let g = incContrast(Math.floor(Math.random() * 255), 0, 255, 30, 225);
     let b = incContrast(Math.floor(Math.random() * 255), 0, 255, 30, 225);
     group = {
       name,
-      color: { r, g, b },
+      _color: { r, g, b },
+      get color() { return this._color },
+      set color(c) { this._color = c; updateColors({ needsUpdate: (voxel) => voxel.group == this }) },
       voxelKeys: new Set()
     };
-    groups[groups.length] = group;
+    groups[groupId] = group;
   }
   voxels.forEach((voxel, key) => {
     if (voxel.selected && !voxel.group) {
@@ -547,7 +586,21 @@ function addSelectedToGroup(group = undefined) {
       group.voxelKeys.add(key);
     }
   });
-  updateColors();
+  updateColors({ needsUpdate: (voxel) => voxel.group == group });
+}
+
+function showGroup(group) {
+  group.voxelKeys.forEach((key) => {
+    voxels.enableByKey(key);
+  });
+  loadScene();
+}
+
+function hideGroup(group) {
+  group.voxelKeys.forEach((key) => {
+    voxels.disableByKey(key);
+  });
+  loadScene();
 }
 
 function unselectAll() {
@@ -579,7 +632,7 @@ function raycastClicked(position) {
       selected.forEach((voxel, key) => {
         voxels.getByKey(key)["selected"] = true;
       });
-      updateColors();
+      updateColors({ needsUpdate: (voxel) => voxel.selected });
     }, 0);
   } else if (clickType == "Select") {
     let voxel = voxels.get(vp.x, vp.y, vp.z);
@@ -601,6 +654,7 @@ function pointToVoxel(p) {
 }
 
 function clearScene() {
+  voxelCubeMap.clear();
   INTERSECTED = null;
   for (let i = scene.children.length - 1; i >= 0; i--) {
     let child = scene.children[i]
@@ -669,19 +723,20 @@ function render() {
       let vp = pointToVoxel(hit.position);
       let voxel = voxels.get(vp.x, vp.y, vp.z);
       if (voxel) {
-        if (!INTERSECTED || INTERSECTED["voxel"] != voxel) {
-          if (INTERSECTED) setColor(INTERSECTED["voxel"].cube, getColor(INTERSECTED["vp"], INTERSECTED["voxel"]));
+        if (!INTERSECTED || INTERSECTED.voxel != voxel) {
+          if (INTERSECTED) setColor(INTERSECTED.cube, getColor(INTERSECTED.vp, INTERSECTED.voxel));
           INTERSECTED = {
             voxel: voxel,
+            cube: voxelCubeMap.get(voxels.getKey(vp.x, vp.y, vp.z)),
             vp: vp
           };
-          setColor(voxel.cube, { r: 0, g: 255, b: 0 })
+          setColor(INTERSECTED.cube, { r: 0, g: 255, b: 0 })
         }
       } else {
         console.log(hit)
       }
     } else {
-      if (INTERSECTED) setColor(INTERSECTED["voxel"].cube, getColor(INTERSECTED["vp"], INTERSECTED["voxel"]));
+      if (INTERSECTED) setColor(INTERSECTED.cube, getColor(INTERSECTED.vp, INTERSECTED.voxel));
       INTERSECTED = null;
     }
     if (doRaycast == "click") {
@@ -727,7 +782,7 @@ function setMousePosition(event) {
     nvoxels.forEach((voxel, key) => {
       voxels.getByKey(key)["selected"] = true;
     });
-    updateColors();
+    updateColors({ needsUpdate: (voxel) => voxel.selected });
   }
 }
 
@@ -755,42 +810,50 @@ function calculateBounds() {
     }
   });
   console.log(voxelsBounds);
+  let updateControls = true;
   coords.forEach(v => {
     positionOffset[v] = (voxelsBounds.max[v] - voxelsBounds.min[v]) / 2 + voxelsBounds.min[v];
+    if (updateControls && Number.isNaN(positionOffset[v])) updateControls = false;
   });
-
-  controls.userPanSpeed = 0.004 * new THREE.Vector3().subVectors(voxelsBounds.max, voxelsBounds.min).length()
-  controls.setPosition(positionOffset);
+  if (updateControls) {
+    controls.userPanSpeed = 0.004 * new THREE.Vector3().subVectors(voxelsBounds.max, voxelsBounds.min).length()
+    controls.setPosition(positionOffset);
+  }
 }
 
-function loadScene() {
-  clearScene();
+function loadScene(reloadGeometry = true) {
   calculateBounds();
 
-  let axisHelper = new THREE.AxisHelper(5);
-  scene.add(axisHelper);
+  if (reloadGeometry) {
+    clearScene();
+    let axisHelper = new THREE.AxisHelper(5);
+    scene.add(axisHelper);
 
-  let vGeometry = new VertexGeometry(true);
-  let i = 0;
-  voxels.forEach((voxel, key) => {
-    let p = voxels.getPosition(key);
-    let cube = vGeometry.add(p, voxel);
-    voxel["cube"] = cube;
-    i++;
-  });
-  vGeometry.drawnObjects().forEach(o => scene.add(o));
-  vGeometry.dispose();
-
+    let vGeometry = new VertexGeometry(true);
+    voxels.forEach((voxel, key) => {
+      let p = voxels.getPosition(key);
+      let cube = vGeometry.add(p, voxel);
+      voxelCubeMap.set(key, cube);
+    });
+    vGeometry.drawnObjects().forEach(o => scene.add(o));
+    vGeometry.dispose();
+  }
   updateColors();
   needsRerendering = true;
 }
 
-function updateColors() {
+function updateColors(filter = null) {
+  let needsUpdate = (voxel) => true;
+  if (filter && filter.needsUpdate != undefined) {
+    needsUpdate = filter.needsUpdate;
+  }
   voxels.forEach((voxel, key) => {
-    let v = voxel.value;
-    let p = voxels.getPosition(key);
-    let color = getColor(p, voxel);
-    setColor(voxel.cube, color);
+    if (needsUpdate(voxel)) {
+      let v = voxel.value;
+      let p = voxels.getPosition(key);
+      let color = getColor(p, voxel);
+      setColor(voxelCubeMap.get(key), color);
+    }
   });
   needsRerendering = true;
 }
@@ -997,13 +1060,13 @@ function setAllValuesTo(voxels, value) {
   voxels.forEach((voxel, key) => {
     voxel.value = value;
   });
-  return voxels;
 }
 
 function filter(filter = "") {
   setTimeout(() => {
     console.log("filter start")
     console.log(voxels.size());
+    let reloadGeometry = true;
     let nVoxels = voxels;
     if (filter.startsWith("Gauss")) {
       nVoxels = gauss3D(voxels);
@@ -1014,19 +1077,23 @@ function filter(filter = "") {
       nVoxels = normalizeGradients(sobel3D(voxels, !filter.endsWith("no blur")));
     } else if (filter.startsWith("Create group from selected")) {
       addSelectedToGroup();
+      reloadGeometry = false;
     } else if (filter.startsWith("Remove selected")) {
       nVoxels = removeSelected(voxels);
     } else if (filter.startsWith("Make all values the same")) {
-      nVoxels = setAllValuesTo(voxels, 10);
+      setAllValuesTo(voxels, 10);
+      reloadGeometry = false;
     } else if (filter.startsWith("Extend edges")) {
       nVoxels = extendEdge(voxels);
     } else if (filter.startsWith("Avg. gradients")) {
       nVoxels = avgGradients(nVoxels);
+      reloadGeometry = false;
     }
     console.log("filter done")
     console.log(nVoxels.size())
+    nVoxels.disabled = voxels.disabled;
     voxels = nVoxels;
-    loadScene();
+    loadScene(reloadGeometry);
   }, 0);
 }
 
