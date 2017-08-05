@@ -27,31 +27,29 @@
         <button md-menu-item *ngFor="let f of service.filterTypes" (click)="service.filter(f)">{{f}}</button>
     </md-menu>
 
-    <md-sidenav-container class="grow">
+    <md-sidenav-container class="grow wh100">
         <md-sidenav #sidenav align="end">
-             <md-tab-group class="min100 wh100">
-                 <md-tab label="Groups" >
-                     <div class="vbox grow wh100 min100">
-                         <md-card *ngFor="let group of service.groups">
-                            <md-card-header >
-                                <div md-card-avatar [style.backgroundColor]="service.rgbToHex(group.color)"
-                                    [colorPicker]="service.rgbToHex(group.color)"
-                                    (colorPickerChange)="group.color=service.hexToRgb($event)"
-                                ></div>
+            <md-tab-group class="min100 wh100">
+                <md-tab label="Groups">
+                    <div class="vbox grow wh100 min100">
+                        <md-card *ngFor="let group of service.groups">
+                            <md-card-header>
+                                <div md-card-avatar [style.backgroundColor]="service.rgbToHex(group.color)" [colorPicker]="service.rgbToHex(group.color)"
+                                    (colorPickerChange)="group.color=service.hexToRgb($event)"></div>
                                 <md-input-container>
                                     <input mdInput placeholder="Name" [value]="group.name">
                                 </md-input-container>
-                                
+
                             </md-card-header>
                             <md-card-actions>
                                 <button md-button (click)="service.addSelectedToGroup(group)">ADD SELECTED</button>
                                 <button md-button (click)="service.showGroup(group)">SHOW ALL</button>
                                 <button md-button (click)="service.hideGroup(group)">HIDE ALL</button>
                             </md-card-actions>
-                        </md-card> 
-                    </div> 
-                </md-tab> 
-            </md-tab-group> 
+                        </md-card>
+                    </div>
+                </md-tab>
+            </md-tab-group>
 
         </md-sidenav>
         <app-surface-view></app-surface-view>
