@@ -1,11 +1,11 @@
 <div class="vbox wh100">
 
     <md-toolbar color="warn">
-        <input type="file" #inputFile>
+        <input type="file" multiple #inputFile>
 
         <input #inputGridSize placeholder="Gridsize" value="100" type="number" maxlength="7">
 
-        <button md-button (click)="service.loadFile(inputFile['files'][0], inputGridSize.value)">Load</button>
+        <button md-button (click)="service.loadFile(inputFile['files'], inputGridSize.value)">Load</button>
         <button md-button [mdMenuTriggerFor]="menuFilter">Filter</button>
         <button md-button> Save</button>
 

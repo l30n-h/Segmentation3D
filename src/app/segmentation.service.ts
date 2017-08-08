@@ -199,12 +199,12 @@ function prepare(sv, c) {
   }, false);
 }
 
-function loadFile(file, gridSize) {
-  if (!file) {
+function loadFile(files, gridSize) {
+  if (!files || !files[0]) {
     console.log('No file selected.');
     return;
   }
-  toVoxels(file, gridSize);
+  toVoxels(Array.from(files), gridSize);
 }
 
 function save() {
@@ -1097,7 +1097,7 @@ function filter(filter = "") {
   }, 0);
 }
 
-function toVoxels(file, rSize) {
+function toVoxels(files, rSize) {
   clean();
   console.log("read start")
   rasterSize = rSize;
@@ -1105,7 +1105,7 @@ function toVoxels(file, rSize) {
   let min = [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
   let max = [Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY];
   let vertexMatcher = /\s*v\s+([\-+]?\d+(?:\.\d+)?)\s+([\-+]?\d+(?:\.\d+)?)\s+([\-+]?\d+(?:\.\d+)?)/;
-  readSomeLines(file, function (line) {
+  readSomeLines(files, (file, line) => {
     let match = vertexMatcher.exec(line)
     if (match) {
       for (let i = 0; i < min.length; i++) {
@@ -1118,7 +1118,7 @@ function toVoxels(file, rSize) {
     let dif = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
     let fac = (rasterSize - 1) / dif;
     let nvoxels = new VoxelMap();
-    readSomeLines(file, function (line) {
+    readSomeLines(files, (file, line) => {
       let match = vertexMatcher.exec(line)
       if (match) {
         let vertexArr = [];
@@ -1149,39 +1149,39 @@ function toVoxels(file, rSize) {
   });
 }
 
-function readSomeLines(file, forEachLine, onComplete) {
-  let CHUNK_SIZE = 20000; // 50kb, arbitrarily chosen.
-  let offset = 0;
-  let results = '';
-  let fr = new FileReader();
-  fr.onload = function () {
-    // Use stream:true in case we cut the file
-    // in the middle of a multi-byte character
-    results += fr.result;
-    let lines = results.split('\n');
-    results = lines.pop(); // In case the line did not end yet.
+function readSomeLines(files, forEachLine, onComplete) {
+  let CHUNK_SIZE = 20000;
 
-    for (let i = 0; i < lines.length; ++i) {
-      forEachLine(lines[i] + '\n');
-    }
-    offset += CHUNK_SIZE;
-    seek();
-  };
-  fr.onerror = function () {
-    onComplete(fr.error);
-  };
-  seek();
-
-  function seek() {
+  function seek(fr, file, offset, results) {
     if (offset !== 0 && offset >= file.size) {
-      // We did not find all lines, but there are no more lines.
-      forEachLine(results); // This is from lines.pop(), before.
-      onComplete(); // Done
+      forEachLine(file, results);
+      if (file == files[files.length - 1]) onComplete();
       return;
     }
     let slice = file.slice(offset, offset + CHUNK_SIZE);
     fr.readAsText(slice);
   }
+
+  files.forEach(file => {
+    let fr = new FileReader();
+    let offset = 0;
+    let results = '';
+    fr.onload = () => {
+      results += fr.result;
+      let lines = results.split('\n');
+      results = lines.pop();
+
+      for (let i = 0; i < lines.length; ++i) {
+        forEachLine(file, lines[i] + '\n');
+      }
+      offset += CHUNK_SIZE;
+      seek(fr, file, offset, results);
+    };
+    fr.onerror = () => {
+      onComplete(fr.error);
+    };
+    seek(fr, file, offset, results);
+  });
 }
 
 function download(filename, text) {
