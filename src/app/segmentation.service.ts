@@ -1,5 +1,6 @@
 import { Injectable, NgZone } from '@angular/core';
 import * as THREE from 'three';
+import * as PIXELS from 'get-pixels';
 
 @Injectable()
 export class SegmentationService {
@@ -134,7 +135,6 @@ let camera: THREE.PerspectiveCamera;
 
 let groups = [];
 let voxels = new VoxelMap();
-let rasterSize;
 let positionOffset = { x: 0, y: 0, z: 0 };
 let voxelsBounds = {
   min: { x: 0, y: 0, z: 0, value: 0, sx: 0, sy: 0, sz: 0 },
@@ -1097,54 +1097,97 @@ function filter(filter = "") {
   }, 0);
 }
 
+function objToVoxels(files, rasterSize, onComplete) {
+  let typeMatcher = /\s*(v|vt|f|l|p|usemtl|mtllib)\s/;
+  let numberMatcher = /[\-+]?\d+(?:\.\d+)?(?:[eE][\-+]?\d+)?/g;
+  let indexMatcher = /(\d+)\/(\d*)\/(\d*)/g;
+
+  let objFiles = files.filter((file) => file.name.endsWith(".obj"));
+  let vertices = [];
+  let uvs = [];
+  let indices = new Map();
+
+  let min = { x: Number.POSITIVE_INFINITY, y: Number.POSITIVE_INFINITY, z: Number.POSITIVE_INFINITY };
+  let max = { x: Number.NEGATIVE_INFINITY, y: Number.NEGATIVE_INFINITY, z: Number.NEGATIVE_INFINITY };
+  let coords = ["x", "y", "z"];
+
+  readSomeLines(objFiles, (file, line) => {
+    let typeMatch = typeMatcher.exec(line);
+    if (typeMatch) {
+      let type = typeMatch[1];
+      if (type.startsWith("v")) {
+        let numbers = [];
+        numberMatcher.lastIndex = 0;
+        for (let i = 0; i < 3; i++) {
+          let numberMatch = numberMatcher.exec(line);
+          if (!numberMatch) break;
+          numbers.push(parseFloat(numberMatch[0]));
+        }
+        if (type == "v") {
+          if (numbers.length < 3) throw file.name + " has an incorrect format " + line;
+          let vertex = { x: numbers[0], y: numbers[1], z: numbers[2] };
+          vertices.push(vertex)
+
+          coords.forEach(v => {
+            min[v] = Math.min(min[v], vertex[v]);
+            max[v] = Math.max(max[v], vertex[v]);
+          });
+        } else {
+          if (numbers.length < 2) throw file.name + " has an incorrect format " + line;
+          uvs.push({ u: numbers[0], v: numbers[1] })
+        }
+      } else if (type == "f" || type == "l" || type == "p") {
+        indexMatcher.lastIndex = 0;
+        for (let i = 0; i < 3; i++) {
+          let indexMatch = indexMatcher.exec(line);
+          if (!indexMatch) break;
+          let index = { v: parseInt(indexMatch[1]) - 1 }
+          if (indexMatch[2]) index["uv"] = parseInt(indexMatch[2]) - 1;
+          indices.set(index.v + "_" + index["uv"], index);
+        }
+      }
+    }
+  }, () => {
+    let dif = Math.max(max.x - min.x, max.y - min.y, max.z - min.z);
+    let fac = (rasterSize - 1) / dif;
+    let nvoxels = new VoxelMap();
+
+    indices.forEach((value) => {
+      let vertex = vertices[value.v];
+      let vertexClamped = { x: 0, y: 0, z: 0 };
+      coords.forEach(v => {
+        vertexClamped[v] = Math.floor((vertex[v] - min[v]) * fac);
+      });
+      let voxel = nvoxels.get(vertexClamped.x, vertexClamped.y, vertexClamped.z);
+      if (voxel) {
+        voxel.value++;
+        voxel.vertices.set(vertex.x, vertex.y, vertex.z, vertex);
+      }
+      else nvoxels.set(vertexClamped.x, vertexClamped.y, vertexClamped.z, { value: 10, vertices: new VoxelMap(vertex) });
+    });
+    nvoxels.forEach((voxel, key) => {
+      voxel.vertices = Array.from(voxel.vertices);
+    });
+    onComplete(nvoxels);
+  });
+}
+
 function toVoxels(files, rSize) {
   clean();
   console.log("read start")
-  rasterSize = rSize;
 
-  let min = [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
-  let max = [Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY];
-  let vertexMatcher = /\s*v\s+([\-+]?\d+(?:\.\d+)?)\s+([\-+]?\d+(?:\.\d+)?)\s+([\-+]?\d+(?:\.\d+)?)/;
-  readSomeLines(files, (file, line) => {
-    let match = vertexMatcher.exec(line)
-    if (match) {
-      for (let i = 0; i < min.length; i++) {
-        let v = parseFloat(match[i + 1]);
-        min[i] = Math.min(min[i], v);
-        max[i] = Math.max(max[i], v);
-      }
-    }
-  }, function onComplete() {
-    let dif = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
-    let fac = (rasterSize - 1) / dif;
-    let nvoxels = new VoxelMap();
-    readSomeLines(files, (file, line) => {
-      let match = vertexMatcher.exec(line)
-      if (match) {
-        let vertexArr = [];
-        let vertexClamped = [];
-        for (let i = 0; i < min.length; i++) {
-          vertexArr[i] = (parseFloat(match[i + 1]) - min[i]) * fac;
-          vertexClamped[i] = Math.floor(vertexArr[i]);
-        }
-        let vertex = { x: vertexArr[0], y: vertexArr[1], z: vertexArr[2] };
-        let voxel = nvoxels.get(vertexClamped[0], vertexClamped[1], vertexClamped[2]);
-        if (voxel) {
-          voxel.value++;
-          voxel.vertices.set(vertex.x, vertex.y, vertex.z, vertex);
-        }
-        else nvoxels.set(vertexClamped[0], vertexClamped[1], vertexClamped[2], { value: 10, vertices: new VoxelMap(vertex) });
-      }
-    }, function onComplete() {
-      console.log('read done');
-      setTimeout(() => {
-        voxels.forEach((voxel, key) => {
-          voxel.vertices = [...voxel.vertices.values()];
-        });
-        console.log(nvoxels.size());
-        voxels = nvoxels;
-        loadScene();
-      }, 0);
+  objToVoxels(files, rSize, (nvoxels) => {
+    console.log('read done');
+
+    // let images = files.filter((file) => file.type.toLowerCase().indexOf("image") !== -1);
+    // if (images && images.length > 0) {
+      
+    // }
+
+    setTimeout(() => {
+      console.log(nvoxels.size());
+      voxels = nvoxels;
+      loadScene();
     });
   });
 }

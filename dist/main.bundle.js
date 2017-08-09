@@ -34,7 +34,7 @@ module.exports = module.exports.toString();
 /***/ "../../../../../src/app/app.component.html":
 /***/ (function(module, exports) {
 
-module.exports = "<div class=\"vbox wh100\">\n\n    <md-toolbar color=\"warn\">\n        <input type=\"file\" #inputFile>\n\n        <input #inputGridSize placeholder=\"Gridsize\" value=\"100\" type=\"number\" maxlength=\"7\">\n\n        <button md-button (click)=\"service.loadFile(inputFile['files'][0], inputGridSize.value)\">Load</button>\n        <button md-button [mdMenuTriggerFor]=\"menuFilter\">Filter</button>\n        <button md-button> Save</button>\n\n        <md-select placeholder=\"Color\" [(ngModel)]=\"service.colorType\">\n            <md-option *ngFor=\"let c of service.colorTypes\" [value]=\"c\">{{c}}</md-option>\n        </md-select>\n\n        <md-select placeholder=\"OnClick\" [(ngModel)]=\"service.clickAction\">\n            <md-option *ngFor=\"let c of service.clickActions\" [value]=\"c\">{{c}}</md-option>\n        </md-select>\n\n        <button md-button (click)=\"service.unselectAll()\">Unselect all</button>\n        <button md-button><md-icon>more_vert</md-icon></button>\n        <span class=\"grow\"></span>\n        <button md-button (click)=\"sidenav.toggle()\"><md-icon>menu</md-icon></button>\n    </md-toolbar>\n\n    <md-menu #menuFilter>\n        <button md-menu-item *ngFor=\"let f of service.filterTypes\" (click)=\"service.filter(f)\">{{f}}</button>\n    </md-menu>\n\n    <md-sidenav-container class=\"grow wh100\">\n        <md-sidenav #sidenav align=\"end\">\n             <md-tab-group class=\"min100 wh100\">\n                 <md-tab label=\"Groups\" >\n                     <div class=\"vbox grow wh100 min100\">\n                         <md-card *ngFor=\"let group of service.groups\">\n                            <md-card-header >\n                                <div md-card-avatar [style.backgroundColor]=\"service.rgbToHex(group.color)\"\n                                    [colorPicker]=\"service.rgbToHex(group.color)\"\n                                    (colorPickerChange)=\"group.color=service.hexToRgb($event)\"\n                                ></div>\n                                <md-input-container>\n                                    <input mdInput placeholder=\"Name\" [value]=\"group.name\">\n                                </md-input-container>\n                                \n                            </md-card-header>\n                            <md-card-actions>\n                                <button md-button (click)=\"service.addSelectedToGroup(group)\">ADD SELECTED</button>\n                                <button md-button (click)=\"service.showGroup(group)\">SHOW ALL</button>\n                                <button md-button (click)=\"service.hideGroup(group)\">HIDE ALL</button>\n                            </md-card-actions>\n                        </md-card> \n                    </div> \n                </md-tab> \n            </md-tab-group> \n\n        </md-sidenav>\n        <app-surface-view ></app-surface-view>\n    </md-sidenav-container>\n\n</div>"
+module.exports = "<div class=\"vbox wh100\">\n\n    <md-toolbar color=\"warn\">\n        <input type=\"file\" multiple #inputFile>\n\n        <input #inputGridSize placeholder=\"Gridsize\" value=\"100\" type=\"number\" maxlength=\"7\">\n\n        <button md-button (click)=\"service.loadFile(inputFile['files'], inputGridSize.value)\">Load</button>\n        <button md-button [mdMenuTriggerFor]=\"menuFilter\">Filter</button>\n        <button md-button> Save</button>\n\n        <md-select placeholder=\"Color\" [(ngModel)]=\"service.colorType\">\n            <md-option *ngFor=\"let c of service.colorTypes\" [value]=\"c\">{{c}}</md-option>\n        </md-select>\n\n        <md-select placeholder=\"OnClick\" [(ngModel)]=\"service.clickAction\">\n            <md-option *ngFor=\"let c of service.clickActions\" [value]=\"c\">{{c}}</md-option>\n        </md-select>\n\n        <button md-button (click)=\"service.unselectAll()\">Unselect all</button>\n        <button md-button><md-icon>more_vert</md-icon></button>\n        <span class=\"grow\"></span>\n        <button md-button (click)=\"sidenav.toggle()\"><md-icon>menu</md-icon></button>\n    </md-toolbar>\n\n    <md-menu #menuFilter>\n        <button md-menu-item *ngFor=\"let f of service.filterTypes\" (click)=\"service.filter(f)\">{{f}}</button>\n    </md-menu>\n\n    <md-sidenav-container class=\"grow wh100\">\n        <md-sidenav #sidenav align=\"end\">\n            <md-tab-group class=\"min100 wh100\">\n                <md-tab label=\"Groups\">\n                    <div class=\"vbox grow wh100 min100\">\n                        <md-card *ngFor=\"let group of service.groups\">\n                            <md-card-header>\n                                <div md-card-avatar [style.backgroundColor]=\"service.rgbToHex(group.color)\" [colorPicker]=\"service.rgbToHex(group.color)\"\n                                    (colorPickerChange)=\"group.color=service.hexToRgb($event)\"></div>\n                                <md-input-container>\n                                    <input mdInput placeholder=\"Name\" [value]=\"group.name\">\n                                </md-input-container>\n\n                            </md-card-header>\n                            <md-card-actions>\n                                <button md-button (click)=\"service.addSelectedToGroup(group)\">ADD SELECTED</button>\n                                <button md-button (click)=\"service.showGroup(group)\">SHOW ALL</button>\n                                <button md-button (click)=\"service.hideGroup(group)\">HIDE ALL</button>\n                            </md-card-actions>\n                        </md-card>\n                    </div>\n                </md-tab>\n            </md-tab-group>\n\n        </md-sidenav>\n        <app-surface-view></app-surface-view>\n    </md-sidenav-container>\n\n</div>"
 
 /***/ }),
 
@@ -281,7 +281,6 @@ var scene;
 var camera;
 var groups = [];
 var voxels = new VoxelMap();
-var rasterSize;
 var positionOffset = { x: 0, y: 0, z: 0 };
 var voxelsBounds = {
     min: { x: 0, y: 0, z: 0, value: 0, sx: 0, sy: 0, sz: 0 },
@@ -336,12 +335,12 @@ function prepare(sv, c) {
         setMousePosition(event);
     }, false);
 }
-function loadFile(file, gridSize) {
-    if (!file) {
+function loadFile(files, gridSize) {
+    if (!files || !files[0]) {
         console.log('No file selected.');
         return;
     }
-    toVoxels(file, gridSize);
+    toVoxels(Array.from(files), gridSize);
 }
 function save() {
     var text = "";
@@ -1210,88 +1209,129 @@ function filter(filter) {
         loadScene(reloadGeometry);
     }, 0);
 }
-function toVoxels(file, rSize) {
-    clean();
-    console.log("read start");
-    rasterSize = rSize;
-    var min = [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
-    var max = [Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY];
-    var vertexMatcher = /\s*v\s+([\-+]?\d+(?:\.\d+)?)\s+([\-+]?\d+(?:\.\d+)?)\s+([\-+]?\d+(?:\.\d+)?)/;
-    readSomeLines(file, function (line) {
-        var match = vertexMatcher.exec(line);
-        if (match) {
-            for (var i = 0; i < min.length; i++) {
-                var v = parseFloat(match[i + 1]);
-                min[i] = Math.min(min[i], v);
-                max[i] = Math.max(max[i], v);
+function objToVoxels(files, rasterSize, onComplete) {
+    var typeMatcher = /\s*(v|vt|f|l|p|usemtl|mtllib)\s/;
+    var numberMatcher = /[\-+]?\d+(?:\.\d+)?(?:[eE][\-+]?\d+)?/g;
+    var indexMatcher = /(\d+)\/(\d*)\/(\d*)/g;
+    var objFiles = files.filter(function (file) { return file.name.endsWith(".obj"); });
+    var vertices = [];
+    var uvs = [];
+    var indices = new Map();
+    var min = { x: Number.POSITIVE_INFINITY, y: Number.POSITIVE_INFINITY, z: Number.POSITIVE_INFINITY };
+    var max = { x: Number.NEGATIVE_INFINITY, y: Number.NEGATIVE_INFINITY, z: Number.NEGATIVE_INFINITY };
+    var coords = ["x", "y", "z"];
+    readSomeLines(objFiles, function (file, line) {
+        var typeMatch = typeMatcher.exec(line);
+        if (typeMatch) {
+            var type = typeMatch[1];
+            if (type.startsWith("v")) {
+                var numbers = [];
+                numberMatcher.lastIndex = 0;
+                for (var i = 0; i < 3; i++) {
+                    var numberMatch = numberMatcher.exec(line);
+                    if (!numberMatch)
+                        break;
+                    numbers.push(parseFloat(numberMatch[0]));
+                }
+                if (type == "v") {
+                    if (numbers.length < 3)
+                        throw file.name + " has an incorrect format " + line;
+                    var vertex_1 = { x: numbers[0], y: numbers[1], z: numbers[2] };
+                    vertices.push(vertex_1);
+                    coords.forEach(function (v) {
+                        min[v] = Math.min(min[v], vertex_1[v]);
+                        max[v] = Math.max(max[v], vertex_1[v]);
+                    });
+                }
+                else {
+                    if (numbers.length < 2)
+                        throw file.name + " has an incorrect format " + line;
+                    uvs.push({ u: numbers[0], v: numbers[1] });
+                }
+            }
+            else if (type == "f" || type == "l" || type == "p") {
+                indexMatcher.lastIndex = 0;
+                for (var i = 0; i < 3; i++) {
+                    var indexMatch = indexMatcher.exec(line);
+                    if (!indexMatch)
+                        break;
+                    var index = { v: parseInt(indexMatch[1]) - 1 };
+                    if (indexMatch[2])
+                        index["uv"] = parseInt(indexMatch[2]) - 1;
+                    indices.set(index.v + "_" + index["uv"], index);
+                }
             }
         }
-    }, function onComplete() {
-        var dif = Math.max(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
+    }, function () {
+        var dif = Math.max(max.x - min.x, max.y - min.y, max.z - min.z);
         var fac = (rasterSize - 1) / dif;
         var nvoxels = new VoxelMap();
-        readSomeLines(file, function (line) {
-            var match = vertexMatcher.exec(line);
-            if (match) {
-                var vertexArr = [];
-                var vertexClamped = [];
-                for (var i = 0; i < min.length; i++) {
-                    vertexArr[i] = (parseFloat(match[i + 1]) - min[i]) * fac;
-                    vertexClamped[i] = Math.floor(vertexArr[i]);
-                }
-                var vertex = { x: vertexArr[0], y: vertexArr[1], z: vertexArr[2] };
-                var voxel = nvoxels.get(vertexClamped[0], vertexClamped[1], vertexClamped[2]);
-                if (voxel) {
-                    voxel.value++;
-                    voxel.vertices.set(vertex.x, vertex.y, vertex.z, vertex);
-                }
-                else
-                    nvoxels.set(vertexClamped[0], vertexClamped[1], vertexClamped[2], { value: 10, vertices: new VoxelMap(vertex) });
+        indices.forEach(function (value) {
+            var vertex = vertices[value.v];
+            var vertexClamped = { x: 0, y: 0, z: 0 };
+            coords.forEach(function (v) {
+                vertexClamped[v] = Math.floor((vertex[v] - min[v]) * fac);
+            });
+            var voxel = nvoxels.get(vertexClamped.x, vertexClamped.y, vertexClamped.z);
+            if (voxel) {
+                voxel.value++;
+                voxel.vertices.set(vertex.x, vertex.y, vertex.z, vertex);
             }
-        }, function onComplete() {
-            console.log('read done');
-            setTimeout(function () {
-                voxels.forEach(function (voxel, key) {
-                    voxel.vertices = voxel.vertices.values().slice();
-                });
-                console.log(nvoxels.size());
-                voxels = nvoxels;
-                loadScene();
-            }, 0);
+            else
+                nvoxels.set(vertexClamped.x, vertexClamped.y, vertexClamped.z, { value: 10, vertices: new VoxelMap(vertex) });
+        });
+        nvoxels.forEach(function (voxel, key) {
+            voxel.vertices = Array.from(voxel.vertices);
+        });
+        onComplete(nvoxels);
+    });
+}
+function toVoxels(files, rSize) {
+    clean();
+    console.log("read start");
+    objToVoxels(files, rSize, function (nvoxels) {
+        console.log('read done');
+        // let images = files.filter((file) => file.type.toLowerCase().indexOf("image") !== -1);
+        // if (images && images.length > 0) {
+        // }
+        setTimeout(function () {
+            console.log(nvoxels.size());
+            voxels = nvoxels;
+            loadScene();
         });
     });
 }
-function readSomeLines(file, forEachLine, onComplete) {
-    var CHUNK_SIZE = 20000; // 50kb, arbitrarily chosen.
-    var offset = 0;
-    var results = '';
-    var fr = new FileReader();
-    fr.onload = function () {
-        // Use stream:true in case we cut the file
-        // in the middle of a multi-byte character
-        results += fr.result;
-        var lines = results.split('\n');
-        results = lines.pop(); // In case the line did not end yet.
-        for (var i = 0; i < lines.length; ++i) {
-            forEachLine(lines[i] + '\n');
-        }
-        offset += CHUNK_SIZE;
-        seek();
-    };
-    fr.onerror = function () {
-        onComplete(fr.error);
-    };
-    seek();
-    function seek() {
+function readSomeLines(files, forEachLine, onComplete) {
+    var CHUNK_SIZE = 20000;
+    function seek(fr, file, offset, results) {
         if (offset !== 0 && offset >= file.size) {
-            // We did not find all lines, but there are no more lines.
-            forEachLine(results); // This is from lines.pop(), before.
-            onComplete(); // Done
+            forEachLine(file, results);
+            if (file == files[files.length - 1])
+                onComplete();
             return;
         }
         var slice = file.slice(offset, offset + CHUNK_SIZE);
         fr.readAsText(slice);
     }
+    files.forEach(function (file) {
+        var fr = new FileReader();
+        var offset = 0;
+        var results = '';
+        fr.onload = function () {
+            results += fr.result;
+            var lines = results.split('\n');
+            results = lines.pop();
+            for (var i = 0; i < lines.length; ++i) {
+                forEachLine(file, lines[i] + '\n');
+            }
+            offset += CHUNK_SIZE;
+            seek(fr, file, offset, results);
+        };
+        fr.onerror = function () {
+            onComplete(fr.error);
+        };
+        seek(fr, file, offset, results);
+    });
 }
 function download(filename, text) {
     var element = document.createElement('a');
